@@ -7,8 +7,9 @@ import com.badlogic.gdx.math.Vector2;
 import com.tankcommander.entities.Entity;
 import com.tankcommander.entities.components.TankBodyComponent;
 import com.tankcommander.entities.components.TransformComponent;
+import com.tankcommander.entities.components.TurretComponent;
+import com.tankcommander.entities.components.WeaponComponent;
 import com.tankcommander.input.*;
-
 
 /**
  * Controlador principal del juego que maneja la entrada del usuario.
@@ -24,12 +25,17 @@ public class GameController {
     private boolean isFiringCannon;
     private boolean isFiringMachineGun;
     private FireMachineGunCommand machineGunCommand;
-    private float fireCooldownTimer;
+    private float lastCannonShotTime;
+    private float cannonCooldown;
 
     // Sensibilidad de controles
     private float movementDeadZone;
     private float turretDeadZone;
     private float mouseSensitivity;
+
+    // Para rotación suave
+    private float currentBodyAngle;
+    private float currentTurretAngle;
 
     public GameController() {
         this.inputMapper = new InputMapper();
@@ -39,6 +45,10 @@ public class GameController {
         this.movementDeadZone = 0.2f;
         this.turretDeadZone = 0.15f;
         this.mouseSensitivity = 0.5f;
+        this.cannonCooldown = 0.5f;
+        this.lastCannonShotTime = 0;
+        this.currentBodyAngle = 0;
+        this.currentTurretAngle = 0;
 
         initializeInputMappings();
         initializeController();
@@ -84,6 +94,17 @@ public class GameController {
     public void setPlayerEntity(Entity player) {
         this.playerEntity = player;
         this.machineGunCommand = new FireMachineGunCommand();
+
+        // Inicializar ángulos desde el transform
+        TransformComponent transform = playerEntity.getComponent(TransformComponent.class);
+        if (transform != null) {
+            this.currentBodyAngle = transform.rotation;
+        }
+
+        TurretComponent turret = playerEntity.getComponent(TurretComponent.class);
+        if (turret != null) {
+            this.currentTurretAngle = turret.turretAngle;
+        }
     }
 
     /**
@@ -103,67 +124,123 @@ public class GameController {
     }
 
     private void processControllerInput(float delta) {
-        // Movimiento del cuerpo con palanca izquierda
+        TankBodyComponent body = playerEntity.getComponent(TankBodyComponent.class);
+        TurretComponent turret = playerEntity.getComponent(TurretComponent.class);
+        WeaponComponent weapons = playerEntity.getComponent(WeaponComponent.class);
+        TransformComponent transform = playerEntity.getComponent(TransformComponent.class);
+
+        if (body == null || transform == null) return;
+
+        // ========== MOVIMIENTO DEL CUERPO (Palanca izquierda) ==========
         Vector2 leftStick = xboxController.getLeftStick();
+
         if (leftStick.len() > movementDeadZone) {
-            MoveCommand moveCommand = new MoveCommand(leftStick);
-            moveCommand.execute(playerEntity);
+            // Normalizar para movimiento consistente
+            Vector2 moveDir = leftStick.cpy().nor();
+            body.moveDirection = moveDir;
+
+            // Calcular ángulo de dirección deseado (en grados)
+            float targetAngle = moveDir.angleDeg();
+
+            // Rotación suave del cuerpo hacia la dirección de movimiento
+            float angleDiff = targetAngle - currentBodyAngle;
+            // Normalizar la diferencia de ángulo a [-180, 180]
+            angleDiff = (angleDiff + 360) % 360;
+            if (angleDiff > 180) angleDiff -= 360;
+
+            // Velocidad de rotación (grados por segundo)
+            float rotationSpeed = body.turnSpeed;
+            float maxRotation = rotationSpeed * delta;
+
+            // Aplicar rotación
+            if (Math.abs(angleDiff) <= maxRotation) {
+                currentBodyAngle = targetAngle;
+            } else {
+                currentBodyAngle += Math.signum(angleDiff) * maxRotation;
+            }
+
+            // Normalizar ángulo
+            currentBodyAngle = (currentBodyAngle + 360) % 360;
+            transform.rotation = currentBodyAngle;
+
         } else {
-            // Detener movimiento
-            TankBodyComponent body = playerEntity.getComponent(TankBodyComponent.class);
-            if (body != null) {
-                body.moveDirection.setZero();
+            // No hay entrada, detener movimiento
+            body.moveDirection.setZero();
+        }
+
+        // ========== ROTACIÓN DE TORRETA (Palanca derecha) ==========
+        if (turret != null) {
+            Vector2 rightStick = xboxController.getRightStick();
+
+            if (rightStick.len() > turretDeadZone) {
+                // Calcular ángulo de la torreta basado en la palanca derecha
+                float targetTurretAngle = rightStick.angleDeg();
+
+                // Rotación suave de la torreta
+                float angleDiff = targetTurretAngle - currentTurretAngle;
+                angleDiff = (angleDiff + 360) % 360;
+                if (angleDiff > 180) angleDiff -= 360;
+
+                float turretRotationSpeed = turret.rotationSpeed;
+                float maxTurretRotation = turretRotationSpeed * delta;
+
+                if (Math.abs(angleDiff) <= maxTurretRotation) {
+                    currentTurretAngle = targetTurretAngle;
+                } else {
+                    currentTurretAngle += Math.signum(angleDiff) * maxTurretRotation;
+                }
+
+                currentTurretAngle = (currentTurretAngle + 360) % 360;
+                turret.rotateTo(currentTurretAngle);
             }
         }
 
-        // Rotación de torreta con palanca derecha
-        Vector2 rightStick = xboxController.getRightStick();
-        if (rightStick.len() > turretDeadZone) {
-            RotateTurretCommand turretCommand = new RotateTurretCommand(rightStick);
-            turretCommand.execute(playerEntity);
-        }
+        // ========== DISPARO DEL CAÑÓN (Botón LB / X) ==========
+        if (xboxController.isButtonPressed(XboxController.BUTTON_X) ||
+            xboxController.getLeftTrigger() > 0.5f) {
+            float currentTime = System.currentTimeMillis() / 1000f;
+            if (currentTime - lastCannonShotTime >= cannonCooldown && weapons != null && turret != null) {
+                lastCannonShotTime = currentTime;
 
-        // Disparo del cañón (botón X / Cuadrado)
-        if (xboxController.isButtonPressed(XboxController.BUTTON_X)) {
-            if (!isFiringCannon) {
-                isFiringCannon = true;
-                FireCannonCommand fireCommand = new FireCannonCommand();
-                fireCommand.execute(playerEntity);
+                // Calcular origen y dirección del disparo
+                Vector2 fireOrigin = turret.getWorldPosition(transform.position, transform.rotation);
+                float angleRad = (float)Math.toRadians(currentTurretAngle);
+                Vector2 fireDirection = new Vector2(
+                    (float)Math.cos(angleRad),
+                    (float)Math.sin(angleRad)
+                ).nor();
+
+                weapons.switchWeapon(0); // Cañón
+                weapons.fireCurrent(fireOrigin, fireDirection);
+
+                Gdx.app.log("GameController", "Cannon fired!");
             }
-        } else {
-            isFiringCannon = false;
         }
 
-        // Disparo de ametralladora (botón B / Círculo)
-        if (xboxController.isButtonPressed(XboxController.BUTTON_B)) {
+        // ========== DISPARO DE AMETRALLADORA (Botón RB / B) ==========
+        if (xboxController.isButtonPressed(XboxController.BUTTON_B) ||
+            xboxController.getRightTrigger() > 0.5f) {
             if (!isFiringMachineGun) {
                 isFiringMachineGun = true;
                 machineGunCommand.startFiring();
             }
+            machineGunCommand.executeContinuous(playerEntity, delta);
         } else {
             if (isFiringMachineGun) {
                 isFiringMachineGun = false;
                 machineGunCommand.stopFiring();
             }
         }
-
-        // Gatillos para disparos alternativos (opcional)
-        float leftTrigger = xboxController.getLeftTrigger();
-        if (leftTrigger > 0.5f) {
-            FireCannonCommand fireCommand = new FireCannonCommand();
-            fireCommand.execute(playerEntity);
-        }
-
-        float rightTrigger = xboxController.getRightTrigger();
-        if (rightTrigger > 0.5f) {
-            machineGunCommand.startFiring();
-            machineGunCommand.executeContinuous(playerEntity, delta);
-        } else if (!xboxController.isButtonPressed(XboxController.BUTTON_B)) {
-            machineGunCommand.stopFiring();
-        }
     }
 
     private void processKeyboardMouseInput(float delta) {
+        TankBodyComponent body = playerEntity.getComponent(TankBodyComponent.class);
+        TurretComponent turret = playerEntity.getComponent(TurretComponent.class);
+        WeaponComponent weapons = playerEntity.getComponent(WeaponComponent.class);
+        TransformComponent transform = playerEntity.getComponent(TransformComponent.class);
+
+        if (body == null || transform == null) return;
+
         // Movimiento con teclado (WASD)
         Vector2 moveDirection = new Vector2(0, 0);
 
@@ -174,37 +251,72 @@ public class GameController {
 
         if (moveDirection.len() > 0) {
             moveDirection.nor();
-            MoveCommand moveCommand = new MoveCommand(moveDirection);
-            moveCommand.execute(playerEntity);
-        } else {
-            TankBodyComponent body = playerEntity.getComponent(TankBodyComponent.class);
-            if (body != null) {
-                body.moveDirection.setZero();
+            body.moveDirection = moveDirection;
+
+            // Rotación del cuerpo con teclado
+            float targetAngle = moveDirection.angleDeg();
+            float angleDiff = targetAngle - currentBodyAngle;
+            angleDiff = (angleDiff + 360) % 360;
+            if (angleDiff > 180) angleDiff -= 360;
+
+            float rotationSpeed = body.turnSpeed;
+            float maxRotation = rotationSpeed * delta;
+
+            if (Math.abs(angleDiff) <= maxRotation) {
+                currentBodyAngle = targetAngle;
+            } else {
+                currentBodyAngle += Math.signum(angleDiff) * maxRotation;
             }
+
+            currentBodyAngle = (currentBodyAngle + 360) % 360;
+            transform.rotation = currentBodyAngle;
+        } else {
+            body.moveDirection.setZero();
         }
 
         // Rotación de torreta con mouse
-        float mouseX = Gdx.input.getX();
-        float mouseY = Gdx.input.getY();
+        if (turret != null) {
+            float mouseX = Gdx.input.getX();
+            float mouseY = Gdx.input.getY();
 
-        // Convertir coordenadas de pantalla a mundo
-        Vector2 mouseWorldPos = new Vector2(mouseX, mouseY);
-        // Asumiendo que tienes acceso a la cámara, aquí simplificado
-        // En implementación real, deberías proyectar las coordenadas
-
-        TransformComponent transform = playerEntity.getComponent(TransformComponent.class);
-        if (transform != null) {
+            // Convertir coordenadas de pantalla a mundo
+            // Nota: Esto necesita la cámara para ser preciso
+            Vector2 mouseWorldPos = new Vector2(mouseX, mouseY);
             Vector2 direction = mouseWorldPos.cpy().sub(transform.position).nor();
-            RotateTurretCommand turretCommand = new RotateTurretCommand(direction);
-            turretCommand.execute(playerEntity);
+            if (direction.len() > 0) {
+                float targetTurretAngle = direction.angleDeg();
+                float angleDiff = targetTurretAngle - currentTurretAngle;
+                angleDiff = (angleDiff + 360) % 360;
+                if (angleDiff > 180) angleDiff -= 360;
+
+                float turretRotationSpeed = turret.rotationSpeed;
+                float maxTurretRotation = turretRotationSpeed * delta;
+
+                if (Math.abs(angleDiff) <= maxTurretRotation) {
+                    currentTurretAngle = targetTurretAngle;
+                } else {
+                    currentTurretAngle += Math.signum(angleDiff) * maxTurretRotation;
+                }
+
+                currentTurretAngle = (currentTurretAngle + 360) % 360;
+                turret.rotateTo(currentTurretAngle);
+            }
         }
 
         // Disparos con mouse
         if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
-            if (!isFiringCannon) {
+            if (!isFiringCannon && weapons != null && turret != null) {
                 isFiringCannon = true;
-                FireCannonCommand fireCommand = new FireCannonCommand();
-                fireCommand.execute(playerEntity);
+
+                Vector2 fireOrigin = turret.getWorldPosition(transform.position, transform.rotation);
+                float angleRad = (float)Math.toRadians(currentTurretAngle);
+                Vector2 fireDirection = new Vector2(
+                    (float)Math.cos(angleRad),
+                    (float)Math.sin(angleRad)
+                ).nor();
+
+                weapons.switchWeapon(0);
+                weapons.fireCurrent(fireOrigin, fireDirection);
             }
         } else {
             isFiringCannon = false;
@@ -224,10 +336,18 @@ public class GameController {
 
         // Disparo continuo con teclado
         if (Gdx.input.isKeyPressed(Input.Keys.SPACE)) {
-            if (!isFiringCannon) {
+            if (!isFiringCannon && weapons != null && turret != null) {
                 isFiringCannon = true;
-                FireCannonCommand fireCommand = new FireCannonCommand();
-                fireCommand.execute(playerEntity);
+
+                Vector2 fireOrigin = turret.getWorldPosition(transform.position, transform.rotation);
+                float angleRad = (float)Math.toRadians(currentTurretAngle);
+                Vector2 fireDirection = new Vector2(
+                    (float)Math.cos(angleRad),
+                    (float)Math.sin(angleRad)
+                ).nor();
+
+                weapons.switchWeapon(0);
+                weapons.fireCurrent(fireOrigin, fireDirection);
             }
         } else {
             isFiringCannon = false;
@@ -247,6 +367,23 @@ public class GameController {
     }
 
     /**
+     * Actualiza los ángulos desde las entidades (para sincronización)
+     */
+    public void updateAngles() {
+        if (playerEntity == null) return;
+
+        TransformComponent transform = playerEntity.getComponent(TransformComponent.class);
+        if (transform != null) {
+            currentBodyAngle = transform.rotation;
+        }
+
+        TurretComponent turret = playerEntity.getComponent(TurretComponent.class);
+        if (turret != null) {
+            currentTurretAngle = turret.turretAngle;
+        }
+    }
+
+    /**
      * Cambia entre controlador y teclado/mouse.
      */
     public void toggleController() {
@@ -262,7 +399,7 @@ public class GameController {
     public void vibrate(float duration, float intensity) {
         if (useController && xboxController != null) {
             // Implementar vibración cuando LibGDX lo soporte
-            // xboxController.vibrate(duration, intensity);
+            Gdx.app.log("GameController", "Vibrate: " + duration + "s, intensity: " + intensity);
         }
     }
 

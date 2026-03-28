@@ -3,6 +3,7 @@ package com.tankcommander.core;
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.assets.AssetManager;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Vector2;
@@ -103,18 +104,21 @@ public class TankCommanderGame extends Game {
     public void render() {
         float delta = Math.min(1/30f, Gdx.graphics.getDeltaTime());
 
+        // LIMPIAR LA PANTALLA - ESTO EVITA EL RASTRO
+        Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
         // Procesar entrada del jugador
         gameController.processInput(delta);
 
-        // Actualizar mundo (físicas, IA, y cámara)
+        // Actualizar mundo (físicas, IA, cámara)
         gameWorld.update(delta);
 
         // Actualizar máquina de estados
         stateMachine.update(delta);
 
-        // El renderizado se hace en stateMachine.render() o aquí
-        // stateMachine.render() ya llama a gameWorld.render() internamente
-        super.render();
+        // Renderizar el mundo
+        gameWorld.render(batch, camera);
     }
 
     @Override
