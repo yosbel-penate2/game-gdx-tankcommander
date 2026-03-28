@@ -1,11 +1,14 @@
 package com.tankcommander.core;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.controllers.Controllers;
 import com.badlogic.gdx.math.Vector2;
 import com.tankcommander.entities.Entity;
 import com.tankcommander.entities.components.TankBodyComponent;
+import com.tankcommander.entities.components.TransformComponent;
 import com.tankcommander.input.*;
+
 
 /**
  * Controlador principal del juego que maneja la entrada del usuario.

@@ -116,7 +116,7 @@ public class GameOverState implements GameState {
     }
 
     @Override
-    public void handleInput()  {
+    public boolean handleInput()  {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
             restartGame();
         }
@@ -124,6 +124,7 @@ public class GameOverState implements GameState {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             Gdx.app.exit();
         }
+        return false;
     }
 
     private void restartGame() {

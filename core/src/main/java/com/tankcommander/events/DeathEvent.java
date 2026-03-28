@@ -19,6 +19,10 @@ public class DeathEvent extends GameEvent {
     private float explosionRadius;
     private boolean isPlayerDeath;
 
+    public DeathEvent(HealthComponent healthComponent, Entity source, DeathCause deathCause, Vector2 deathPosition) {
+
+    }
+
     public enum DeathCause {
         COMBAT,
         EXPLOSION,

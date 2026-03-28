@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.tankcommander.core.TankCommanderGame;
@@ -98,7 +99,7 @@ public class PauseState implements GameState {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void handleInput() {
+    public boolean handleInput() {
         // Navegación del menú
         if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
             selectedOption = (selectedOption - 1 + menuOptions.length) % menuOptions.length;
@@ -117,6 +118,7 @@ public class PauseState implements GameState {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             resumeGame();
         }
+        return false;
     }
 
     private void executeSelectedOption() {

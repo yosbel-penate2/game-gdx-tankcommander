@@ -4,6 +4,10 @@ import com.tankcommander.events.DamageEvent;
 import com.tankcommander.events.DeathEvent;
 import com.tankcommander.events.EventManager;
 
+import com.tankcommander.entities.Entity;
+import com.badlogic.gdx.math.Vector2;
+
+
 /**
  * Componente que gestiona la salud de una entidad.
  * Maneja daño, curación, invulnerabilidad y eventos relacionados.

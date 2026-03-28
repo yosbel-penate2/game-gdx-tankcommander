@@ -14,6 +14,10 @@ import com.tankcommander.events.EventListener;
 import com.tankcommander.events.GameEvent;
 import com.tankcommander.systems.*;
 
+import com.badlogic.gdx.Gdx;
+import com.tankcommander.entities.components.Component;
+
+
 /**
  * Mundo del juego que gestiona todas las entidades y sistemas.
  * Centraliza la lógica de actualización y renderizado.

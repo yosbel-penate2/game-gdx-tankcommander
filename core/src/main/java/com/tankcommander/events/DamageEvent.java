@@ -2,6 +2,7 @@ package com.tankcommander.events;
 
 import com.badlogic.gdx.math.Vector2;
 import com.tankcommander.entities.Entity;
+import com.tankcommander.entities.components.HealthComponent;
 
 /**
  * Evento que se dispara cuando una entidad recibe daño.
@@ -17,6 +18,10 @@ public class DamageEvent extends GameEvent {
     private DamageType damageType;
     private boolean isCritical;
     private boolean isFatal;
+
+    public DamageEvent(HealthComponent healthComponent, Entity source, float actualDamage, float currentHealth, float maxHealth, Vector2 hitPoint, DamageType damageType) {
+
+    }
 
     public enum DamageType {
         KINETIC,

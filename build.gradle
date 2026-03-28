@@ -1,22 +1,27 @@
 buildscript {
+  ext {
+    gdxVersion = '1.12.1'
+  }
+
   repositories {
     mavenCentral()
     gradlePluginPortal()
-    mavenLocal()
     google()
-    maven { url = 'https://central.sonatype.com/repository/maven-snapshots/' }
+    maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
   }
+
   dependencies {
-
-
+    classpath "com.badlogicgames.gdx:gdx-tools:$gdxVersion"
   }
 }
+
+// Define propiedades globales
+ext.appName = 'TankCommander'
 
 allprojects {
   apply plugin: 'eclipse'
   apply plugin: 'idea'
 
-  // This allows you to "Build and run using IntelliJ IDEA", an option in IDEA's Settings.
   idea {
     module {
       outputDir = file('build/classes/java/main')
@@ -25,45 +30,56 @@ allprojects {
   }
 }
 
+// Aplica configuraciones generales a todos los subproyectos
 configure(subprojects) {
   apply plugin: 'java-library'
-  java.sourceCompatibility = 8
 
-  // From https://lyze.dev/2021/04/29/libGDX-Internal-Assets-List/
-  // The article can be helpful when using assets.txt in your project.
-  tasks.register('generateAssetList') {
-    inputs.dir("${project.rootDir}/assets/")
-    // projectFolder/assets
-    File assetsFolder = new File("${project.rootDir}/assets/")
-    // projectFolder/assets/assets.txt
-    File assetsFile = new File(assetsFolder, "assets.txt")
-    // delete that file in case we've already created it
-    assetsFile.delete()
-
-    // iterate through all files inside that folder
-    // convert it to a relative path
-    // and append it to the file assets.txt
-    fileTree(assetsFolder).collect { assetsFolder.relativePath(it) }.sort().each {
-      assetsFile.append(it + "\n")
-    }
-  }
-  processResources.dependsOn 'generateAssetList'
+    java.sourceCompatibility = JavaVersion.VERSION_1_8
+    java.targetCompatibility = JavaVersion.VERSION_1_8
 
   compileJava {
     options.incremental = true
+    options.encoding = 'UTF-8'
+    // Suprime advertencia sobre Java 8 obsoleto
+    options.compilerArgs << '-Xlint:-options'
   }
 }
 
+// Aplica generateAssetList SOLO al módulo :core
+project(':core') {
+  tasks.register('generateAssetList') {
+    def assetsDir = file("${project.rootDir}/assets")
+    def outputFile = new File(assetsDir, "assets.txt")
+
+    if (assetsDir.exists()) {
+      inputs.dir(assetsDir)
+      outputs.file(outputFile)
+
+      doLast {
+        outputFile.delete()
+        fileTree(assetsDir).collect {
+          assetsDir.toPath().relativize(it.toPath()).toString()
+        }
+          .findAll { it != 'assets.txt' }
+          .sort()
+          .each { outputFile.append(it + "\n") }
+      }
+    }
+  }
+  processResources.dependsOn 'generateAssetList'
+}
+
+// Repositorios para todos los subproyectos
 subprojects {
   version = "$projectVersion"
-  ext.appName = 'TankCommander'
+
   repositories {
     mavenCentral()
-    // You may want to remove the following line if you have errors downloading dependencies.
     mavenLocal()
-    maven { url = 'https://central.sonatype.com/repository/maven-snapshots/' }
-    maven { url = 'https://jitpack.io' }
+    google()
+    maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
+    maven { url 'https://jitpack.io' }
   }
 }
 
-eclipse.project.name = 'TankCommander' + '-parent'
+eclipse.project.name = appName + '-parent'

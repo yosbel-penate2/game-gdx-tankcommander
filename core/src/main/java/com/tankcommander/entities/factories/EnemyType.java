@@ -1,5 +1,7 @@
 package com.tankcommander.entities.factories;
 
+import com.badlogic.gdx.graphics.Color;
+
 /**
  * Enumeración de los diferentes tipos de enemigos en el juego.
  * Cada tipo tiene estadísticas y comportamientos específicos.

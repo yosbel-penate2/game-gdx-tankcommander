@@ -4,6 +4,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.tankcommander.entities.Entity;
 import com.tankcommander.entities.components.RenderComponent;
@@ -35,7 +36,7 @@ public class RenderSystem implements GameSystem {
     @Override
     public void update(float delta, Array<Entity> entities) {
         // Ordenar entidades por capa de renderizado
-        Array<Entity> sortedEntities = entities.select(entity ->
+        Array<Entity> sortedEntities = (Array<Entity>) entities.select(entity ->
             entity.hasComponent(RenderComponent.class) &&
                 entity.hasComponent(TransformComponent.class)
         );
