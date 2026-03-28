@@ -17,7 +17,7 @@ public class XboxController implements ControllerListener {
     public static final int BUTTON_B = 1;
     public static final int BUTTON_X = 2;
     public static final int BUTTON_Y = 3;
-    public static final int BUTTON_LB = 4;
+    public static final int BUTTON_LB = 10;
     public static final int BUTTON_RB = 5;
     public static final int BUTTON_BACK = 6;
     public static final int BUTTON_START = 7;

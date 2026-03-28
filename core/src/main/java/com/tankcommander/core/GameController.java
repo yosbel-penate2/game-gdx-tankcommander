@@ -3,6 +3,9 @@ package com.tankcommander.core;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.controllers.Controllers;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Vector2;
 import com.tankcommander.entities.Entity;
 import com.tankcommander.entities.components.*;
@@ -121,7 +124,6 @@ public class GameController {
     }
 
     private void processControllerInput(float delta) {
-        // NUEVO: actualizar el estado del controlador
         if (xboxController != null) {
             xboxController.update();
         }
@@ -133,9 +135,8 @@ public class GameController {
 
         if (body == null || transform == null) return;
 
-        // ========== MOVIMIENTO DEL CUERPO (Palanca izquierda) ==========
+        // ========== MOVIMIENTO DEL CUERPO ==========
         Vector2 leftStick = xboxController.getLeftStick();
-
         if (leftStick.len() > movementDeadZone) {
             Vector2 moveDir = leftStick.cpy().nor();
             body.moveDirection = moveDir;
@@ -156,15 +157,13 @@ public class GameController {
 
             currentBodyAngle = (currentBodyAngle + 360) % 360;
             transform.rotation = currentBodyAngle;
-
         } else {
             body.moveDirection.setZero();
         }
 
-        // ========== ROTACIÓN DE TORRETA (Palanca derecha) ==========
+        // ========== ROTACIÓN DE TORRETA ==========
         if (turret != null) {
             Vector2 rightStick = xboxController.getRightStick();
-
             if (rightStick.len() > turretDeadZone) {
                 float targetTurretAngle = rightStick.angleDeg();
                 float angleDiff = targetTurretAngle - currentTurretAngle;
@@ -185,35 +184,46 @@ public class GameController {
             }
         }
 
-        // ========== DISPARO DEL CAÑÓN (Botón LB / Z izquierdo) ==========
-        // MODIFICADO: usar BUTTON_LB en lugar de BUTTON_X
-        if (xboxController.isButtonPressed(XboxController.BUTTON_LB) ||      // Botón LB (Z izquierdo)
-            xboxController.getLeftTrigger() > 0.5f) {
-            float currentTime = System.currentTimeMillis() / 1000f;
-            if (currentTime - lastCannonShotTime >= cannonCooldown && weapons != null && turret != null) {
-                lastCannonShotTime = currentTime;
+        // ========== DISPARO DEL CAÑÓN (Usando SOLO el cooldown del arma) ==========
+        boolean lbPressed = xboxController.isButtonPressed(XboxController.BUTTON_LB);
 
-                // Calcular origen y dirección del disparo
-                Vector2 fireOrigin = turret.getWorldPosition(transform.position, transform.rotation);
-                float angleRad = (float)Math.toRadians(currentTurretAngle);
-                Vector2 fireDirection = new Vector2(
-                    (float)Math.cos(angleRad),
-                    (float)Math.sin(angleRad)
-                ).nor();
+        if (lbPressed || xboxController.getLeftTrigger() > 0.5f) {
+            if (weapons != null && turret != null && transform != null) {
+                // Verificar si el arma está lista (cooldown del arma)
+                if (weapons.cooldownTimers != null && weapons.cooldownTimers.length > 0 &&
+                    weapons.cooldownTimers[0] <= 0) {
 
-                weapons.switchWeapon(0); // Cañón
-                Projectile projectile = weapons.fireCurrent(fireOrigin, fireDirection);
+                    Gdx.app.log("GameController", "¡DISPARANDO CAÑÓN!");
 
-                // NUEVO: agregar el proyectil al mundo si existe
-                if (projectile != null && gameWorld != null) {
-                    addProjectileToWorld(projectile, fireOrigin, fireDirection);
+                    // Calcular origen y dirección del disparo
+                    Vector2 fireOrigin = turret.getWorldPosition(transform.position, transform.rotation);
+                    float angleRad = (float)Math.toRadians(currentTurretAngle);
+                    Vector2 fireDirection = new Vector2(
+                        (float)Math.cos(angleRad),
+                        (float)Math.sin(angleRad)
+                    ).nor();
+
+                    weapons.switchWeapon(0); // Cañón
+                    Projectile projectile = weapons.fireCurrent(fireOrigin, fireDirection);
+
+                    if (projectile != null && gameWorld != null) {
+                        addProjectileToWorld(projectile, fireOrigin, fireDirection);
+                        Gdx.app.log("GameController", "Proyectil creado exitosamente");
+                    } else {
+                        Gdx.app.log("GameController", "ERROR: projectile=" + projectile);
+                    }
+                } else {
+                    // Mostrar cooldown restante
+                    float remaining = weapons.cooldownTimers != null && weapons.cooldownTimers.length > 0 ?
+                        weapons.cooldownTimers[0] : -1;
+                    Gdx.app.log("GameController", "Arma en cooldown: " + remaining + "s");
                 }
-
-                Gdx.app.log("GameController", "Cannon fired from LB button!");
+            } else {
+                Gdx.app.log("GameController", "ERROR: weapons=" + weapons + ", turret=" + turret);
             }
         }
 
-        // ========== DISPARO DE AMETRALLADORA (Botón RB / B) ==========
+        // ========== DISPARO DE AMETRALLADORA ==========
         if (xboxController.isButtonPressed(XboxController.BUTTON_B) ||
             xboxController.getRightTrigger() > 0.5f) {
             if (!isFiringMachineGun) {
@@ -231,10 +241,7 @@ public class GameController {
 
     // NUEVO: método para agregar proyectil al mundo
     private void addProjectileToWorld(Projectile projectile, Vector2 origin, Vector2 direction) {
-        // Calcular velocidad del proyectil (400 unidades por segundo en la dirección)
         Vector2 velocity = direction.cpy().scl(400f);
-
-        // Crear entidad proyectil
         Entity projectileEntity = new Entity();
 
         // Transformación
@@ -247,15 +254,24 @@ public class GameController {
         physics.maxSpeed = velocity.len();
         projectileEntity.addComponent(physics);
 
-        // Renderizado (opcional, puedes crear una textura pequeña)
-        // Por ahora usamos una textura temporal
-
-        // Componente de vida útil (se eliminará después de un tiempo)
-        // Esto se manejará en un sistema de proyectiles más adelante
+        // Renderizado - IMPORTANTE: crear una textura visible
+        Texture projectileTexture = createProjectileTexture();
+        RenderComponent render = new RenderComponent(new TextureRegion(projectileTexture));
+        render.layer = 2;
+        render.scale = 0.5f;
+        projectileEntity.addComponent(render);
 
         gameWorld.addEntity(projectileEntity);
+        Gdx.app.log("GameController", "Proyectil añadido al mundo en: " + origin);
+    }
 
-        Gdx.app.log("GameController", "Projectile added to world at: " + origin);
+    private Texture createProjectileTexture() {
+        Pixmap pixmap = new Pixmap(8, 8, Pixmap.Format.RGBA8888);
+        pixmap.setColor(1, 1, 0, 1); // Amarillo
+        pixmap.fillCircle(4, 4, 3);
+        Texture texture = new Texture(pixmap);
+        pixmap.dispose();
+        return texture;
     }
 
     private void processKeyboardMouseInput(float delta) {
