@@ -14,8 +14,6 @@ import com.tankcommander.events.EventListener;
 import com.tankcommander.events.GameEvent;
 import com.tankcommander.systems.*;
 import com.badlogic.gdx.Gdx;
-
-import com.badlogic.gdx.Gdx;
 import com.tankcommander.entities.components.Component;
 
 
@@ -32,6 +30,7 @@ public class GameWorld implements EventListener {
     private PhysicsSystem physicsSystem;
     private RenderSystem renderSystem;
     private AISystem aiSystem;
+    private CollisionSystem collisionSystem;
 
     // Cámara que sigue al jugador
     private OrthographicCamera camera;
@@ -43,7 +42,6 @@ public class GameWorld implements EventListener {
     private int enemiesDefeated;
     private int totalScore;
     private float worldTime;
-    private CollisionSystem collisionSystem;
 
     public GameWorld() {
         this.entities = new DelayedRemovalArray<>(true, 100);
@@ -68,9 +66,10 @@ public class GameWorld implements EventListener {
 
     private void initializeSystems() {
         physicsSystem = new PhysicsSystem();
-        aiSystem = new AISystem(null); // Se establecerá el jugador después
         collisionSystem = new CollisionSystem();
+        aiSystem = new AISystem(null);
 
+        // IMPORTANTE: Orden correcto: Física -> Colisiones -> IA
         systems.add(physicsSystem);
         systems.add(collisionSystem);
         systems.add(aiSystem);
@@ -144,7 +143,7 @@ public class GameWorld implements EventListener {
     public void update(float delta) {
         worldTime += delta;
 
-        // Actualizar todas las entidades
+        // Actualizar todas las entidades (componentes)
         for (int i = 0; i < entities.size; i++) {
             Entity entity = entities.get(i);
             if (entity != null) {
@@ -152,7 +151,7 @@ public class GameWorld implements EventListener {
             }
         }
 
-        // Actualizar sistemas
+        // Actualizar sistemas en orden
         for (GameSystem system : systems) {
             system.update(delta, entities);
         }
@@ -170,9 +169,6 @@ public class GameWorld implements EventListener {
 
         // Actualizar cámara para seguir al jugador
         updateCamera(delta);
-
-        // Limpiar eventos procesados
-        // eventManager.clear(); // Opcional, según implementación
     }
 
     /**
@@ -211,7 +207,7 @@ public class GameWorld implements EventListener {
         if (transformA == null || transformB == null) return false;
 
         float distance = transformA.position.dst(transformB.position);
-        float collisionDistance = 32f; // Radio de colisión base
+        float collisionDistance = 32f;
 
         return distance < collisionDistance;
     }
@@ -298,15 +294,12 @@ public class GameWorld implements EventListener {
         if (event instanceof DeathEvent) {
             DeathEvent deathEvent = (DeathEvent) event;
 
-            // Si un enemigo muere, aumentar puntuación
             if (deathEvent.getKiller() == player && deathEvent.getDeceased() != player) {
                 addScore(deathEvent.getScoreValue());
                 addEnemyDefeated();
             }
 
-            // Si el jugador muere, marcar para eliminación
             if (deathEvent.getDeceased() == player) {
-                // El jugador ha muerto, se manejará en el estado de juego
                 Gdx.app.log("GameWorld", "Player destroyed!");
             }
         }

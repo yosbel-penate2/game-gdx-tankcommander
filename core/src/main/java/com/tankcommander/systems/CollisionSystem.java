@@ -11,6 +11,8 @@ import com.tankcommander.entities.components.*;
 public class CollisionSystem implements GameSystem {
     private Vector2 tempVector;
     private float minCollisionDistance = 32f;
+    private float restitution = 0.3f; // Factor de rebote (0 = sin rebote, 1 = rebote perfecto)
+    private float separationFactor = 1.2f; // Factor de separación (mayor = más separación)
 
     public CollisionSystem() {
         this.tempVector = new Vector2();
@@ -41,6 +43,11 @@ public class CollisionSystem implements GameSystem {
             return;
         }
 
+        // Verificar si alguna entidad está en cooldown de colisión
+        if (!collA.canProcessCollision() || !collB.canProcessCollision()) {
+            return;
+        }
+
         TransformComponent transformA = a.getComponent(TransformComponent.class);
         TransformComponent transformB = b.getComponent(TransformComponent.class);
         PhysicsComponent physicsA = a.getComponent(PhysicsComponent.class);
@@ -54,54 +61,64 @@ public class CollisionSystem implements GameSystem {
 
         // Si hay colisión
         if (distance < minDistance) {
+            // Activar cooldown para evitar múltiples colisiones
+            collA.startCollisionCooldown();
+            collB.startCollisionCooldown();
+
             collA.isColliding = true;
             collB.isColliding = true;
             collA.collidingEntity = b;
             collB.collidingEntity = a;
 
-            // Calcular vector de colisión
+            // Calcular vector de colisión (desde A hacia B)
             Vector2 collisionVector = transformB.position.cpy().sub(transformA.position).nor();
             collA.collisionNormal.set(collisionVector);
-            collB.collisionNormal.set(collisionVector.scl(-1));
+            collB.collisionNormal.set(collisionVector.cpy().scl(-1));
 
-            // Separar las entidades
+            // Separar las entidades con factor de separación
             float overlap = minDistance - distance;
-            Vector2 separation = collisionVector.cpy().scl(overlap * 0.5f);
+            Vector2 separation = collisionVector.cpy().scl(overlap * 0.5f * separationFactor);
 
+            // Aplicar separación
             transformA.position.sub(separation);
             transformB.position.add(separation);
 
-            // DETENER EL MOVIMIENTO - ESTO ES LO IMPORTANTE
-            if (physicsA != null) {
-                // Detener completamente al tanque A
-                physicsA.velocity.setZero();
-                physicsA.force.setZero();
+            // APLICAR REBOTE SUAVE (en lugar de detención completa)
+            if (physicsA != null && physicsB != null) {
+                // Calcular velocidad relativa
+                Vector2 relativeVelocity = physicsB.velocity.cpy().sub(physicsA.velocity);
+                float velocityAlong = relativeVelocity.dot(collisionVector);
 
-                // También detener la dirección de movimiento deseada
-                TankBodyComponent bodyA = a.getComponent(TankBodyComponent.class);
-                if (bodyA != null) {
-                    bodyA.moveDirection.setZero();
+                // Solo aplicar rebote si se están acercando
+                if (velocityAlong < 0) {
+                    // Calcular impulso de rebote
+                    float impulse = (1 + restitution) * velocityAlong;
+
+                    // Aplicar cambio de velocidad (dividido por masa, asumiendo masa = 1)
+                    physicsA.velocity.add(collisionVector.cpy().scl(impulse));
+                    physicsB.velocity.sub(collisionVector.cpy().scl(impulse));
+
+                    // Limitar velocidad máxima después del rebote
+                    float maxSpeed = Math.max(physicsA.maxSpeed, physicsB.maxSpeed);
+                    if (physicsA.velocity.len() > maxSpeed) {
+                        physicsA.velocity.setLength(maxSpeed);
+                    }
+                    if (physicsB.velocity.len() > maxSpeed) {
+                        physicsB.velocity.setLength(maxSpeed);
+                    }
                 }
             }
 
-            if (physicsB != null) {
-                // Detener completamente al tanque B
-                physicsB.velocity.setZero();
-                physicsB.force.setZero();
+            // También detener la dirección de movimiento deseada para evitar empuje continuo
+            TankBodyComponent bodyA = a.getComponent(TankBodyComponent.class);
+            TankBodyComponent bodyB = b.getComponent(TankBodyComponent.class);
 
-                // También detener la dirección de movimiento deseada
-                TankBodyComponent bodyB = b.getComponent(TankBodyComponent.class);
-                if (bodyB != null) {
-                    bodyB.moveDirection.setZero();
-                }
+            if (bodyA != null && physicsA != null && physicsA.velocity.len() < 10f) {
+                bodyA.moveDirection.setZero();
             }
 
-            // Efecto visual de colisión (opcional)
-            // Notificar evento de colisión
-            if (collA.layer == CollisionComponent.CollisionLayer.PLAYER ||
-                collB.layer == CollisionComponent.CollisionLayer.PLAYER) {
-                // Vibrar controlador si es el jugador
-                // Gdx.input.vibrate(100);
+            if (bodyB != null && physicsB != null && physicsB.velocity.len() < 10f) {
+                bodyB.moveDirection.setZero();
             }
         }
     }

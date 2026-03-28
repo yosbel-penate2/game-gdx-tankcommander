@@ -16,6 +16,11 @@ public class CollisionComponent implements Component {
     public CollisionLayer layer;
     public CollisionLayer[] collidesWith;
 
+    // NUEVO: temporizador para evitar múltiples colisiones
+    public float collisionCooldown;
+    public float collisionTimer;
+    public static final float DEFAULT_COOLDOWN = 0.2f; // 200ms de enfriamiento
+
     public enum CollisionLayer {
         PLAYER,
         ENEMY,
@@ -31,6 +36,8 @@ public class CollisionComponent implements Component {
         this.collisionNormal = new Vector2();
         this.layer = CollisionLayer.OBSTACLE;
         this.collidesWith = new CollisionLayer[0];
+        this.collisionCooldown = DEFAULT_COOLDOWN;
+        this.collisionTimer = 0f;
     }
 
     public CollisionComponent(float width, float height, CollisionLayer layer) {
@@ -55,8 +62,28 @@ public class CollisionComponent implements Component {
         return false;
     }
 
+    // NUEVO: verifica si puede procesar una nueva colisión
+    public boolean canProcessCollision() {
+        return collisionTimer <= 0;
+    }
+
+    // NUEVO: activa el temporizador de enfriamiento
+    public void startCollisionCooldown() {
+        collisionTimer = collisionCooldown;
+    }
+
+    // NUEVO: actualiza el temporizador
+    public void updateCooldown(float delta) {
+        if (collisionTimer > 0) {
+            collisionTimer -= delta;
+        }
+    }
+
     @Override
     public void update(float delta) {
+        // Actualizar temporizador de enfriamiento
+        updateCooldown(delta);
+
         // Reset colisión cada frame
         isColliding = false;
         collidingEntity = null;
