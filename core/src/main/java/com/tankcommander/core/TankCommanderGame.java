@@ -49,6 +49,11 @@ public class TankCommanderGame extends Game {
         gameController = new GameController();
         entityFactory = new EntityFactory(assetManager, eventManager);
 
+        // NUEVO: conectar GameController con GameWorld
+        gameController.setGameWorld(gameWorld);
+
+        entityFactory = new EntityFactory(assetManager, eventManager);
+
         // Crear jugador en el centro de la pantalla
         player = entityFactory.createPlayer();
         TransformComponent playerTransform = player.getComponent(TransformComponent.class);

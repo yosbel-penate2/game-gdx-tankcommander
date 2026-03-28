@@ -5,20 +5,21 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.controllers.Controllers;
 import com.badlogic.gdx.math.Vector2;
 import com.tankcommander.entities.Entity;
-import com.tankcommander.entities.components.TankBodyComponent;
-import com.tankcommander.entities.components.TransformComponent;
-import com.tankcommander.entities.components.TurretComponent;
-import com.tankcommander.entities.components.WeaponComponent;
+import com.tankcommander.entities.components.*;
 import com.tankcommander.input.*;
+import com.tankcommander.weapons.Projectile;
+
+import com.tankcommander.entities.components.PhysicsComponent;
+import com.tankcommander.entities.components.TransformComponent;
 
 /**
  * Controlador principal del juego que maneja la entrada del usuario.
- * Traduce las entradas del teclado y joystick en comandos para el tanque.
  */
 public class GameController {
     private XboxController xboxController;
     private InputMapper inputMapper;
     private Entity playerEntity;
+    private GameWorld gameWorld;  // NUEVO: referencia al mundo
     private boolean useController;
 
     // Estados de entrada para disparo continuo
@@ -54,6 +55,11 @@ public class GameController {
         initializeController();
     }
 
+    // NUEVO: establecer referencia al mundo
+    public void setGameWorld(GameWorld gameWorld) {
+        this.gameWorld = gameWorld;
+    }
+
     private void initializeInputMappings() {
         // Mapeos para teclado (se pueden personalizar)
         // Movimiento - WASD
@@ -76,7 +82,6 @@ public class GameController {
     }
 
     private void initializeController() {
-        // Buscar controlador Xbox conectado
         if (Controllers.getControllers().size > 0) {
             xboxController = new XboxController(Controllers.getControllers().first());
             useController = true;
@@ -88,14 +93,10 @@ public class GameController {
         }
     }
 
-    /**
-     * Establece la entidad del jugador que será controlada.
-     */
     public void setPlayerEntity(Entity player) {
         this.playerEntity = player;
         this.machineGunCommand = new FireMachineGunCommand();
 
-        // Inicializar ángulos desde el transform
         TransformComponent transform = playerEntity.getComponent(TransformComponent.class);
         if (transform != null) {
             this.currentBodyAngle = transform.rotation;
@@ -107,9 +108,6 @@ public class GameController {
         }
     }
 
-    /**
-     * Procesa toda la entrada del usuario cada frame.
-     */
     public void processInput(float delta) {
         if (playerEntity == null) return;
 
@@ -119,11 +117,15 @@ public class GameController {
             processKeyboardMouseInput(delta);
         }
 
-        // Procesar disparo continuo
         processContinuousFire(delta);
     }
 
     private void processControllerInput(float delta) {
+        // NUEVO: actualizar el estado del controlador
+        if (xboxController != null) {
+            xboxController.update();
+        }
+
         TankBodyComponent body = playerEntity.getComponent(TankBodyComponent.class);
         TurretComponent turret = playerEntity.getComponent(TurretComponent.class);
         WeaponComponent weapons = playerEntity.getComponent(WeaponComponent.class);
@@ -135,36 +137,27 @@ public class GameController {
         Vector2 leftStick = xboxController.getLeftStick();
 
         if (leftStick.len() > movementDeadZone) {
-            // Normalizar para movimiento consistente
             Vector2 moveDir = leftStick.cpy().nor();
             body.moveDirection = moveDir;
 
-            // Calcular ángulo de dirección deseado (en grados)
             float targetAngle = moveDir.angleDeg();
-
-            // Rotación suave del cuerpo hacia la dirección de movimiento
             float angleDiff = targetAngle - currentBodyAngle;
-            // Normalizar la diferencia de ángulo a [-180, 180]
             angleDiff = (angleDiff + 360) % 360;
             if (angleDiff > 180) angleDiff -= 360;
 
-            // Velocidad de rotación (grados por segundo)
             float rotationSpeed = body.turnSpeed;
             float maxRotation = rotationSpeed * delta;
 
-            // Aplicar rotación
             if (Math.abs(angleDiff) <= maxRotation) {
                 currentBodyAngle = targetAngle;
             } else {
                 currentBodyAngle += Math.signum(angleDiff) * maxRotation;
             }
 
-            // Normalizar ángulo
             currentBodyAngle = (currentBodyAngle + 360) % 360;
             transform.rotation = currentBodyAngle;
 
         } else {
-            // No hay entrada, detener movimiento
             body.moveDirection.setZero();
         }
 
@@ -173,10 +166,7 @@ public class GameController {
             Vector2 rightStick = xboxController.getRightStick();
 
             if (rightStick.len() > turretDeadZone) {
-                // Calcular ángulo de la torreta basado en la palanca derecha
                 float targetTurretAngle = rightStick.angleDeg();
-
-                // Rotación suave de la torreta
                 float angleDiff = targetTurretAngle - currentTurretAngle;
                 angleDiff = (angleDiff + 360) % 360;
                 if (angleDiff > 180) angleDiff -= 360;
@@ -195,8 +185,9 @@ public class GameController {
             }
         }
 
-        // ========== DISPARO DEL CAÑÓN (Botón LB / X) ==========
-        if (xboxController.isButtonPressed(XboxController.BUTTON_X) ||
+        // ========== DISPARO DEL CAÑÓN (Botón LB / Z izquierdo) ==========
+        // MODIFICADO: usar BUTTON_LB en lugar de BUTTON_X
+        if (xboxController.isButtonPressed(XboxController.BUTTON_LB) ||      // Botón LB (Z izquierdo)
             xboxController.getLeftTrigger() > 0.5f) {
             float currentTime = System.currentTimeMillis() / 1000f;
             if (currentTime - lastCannonShotTime >= cannonCooldown && weapons != null && turret != null) {
@@ -211,9 +202,14 @@ public class GameController {
                 ).nor();
 
                 weapons.switchWeapon(0); // Cañón
-                weapons.fireCurrent(fireOrigin, fireDirection);
+                Projectile projectile = weapons.fireCurrent(fireOrigin, fireDirection);
 
-                Gdx.app.log("GameController", "Cannon fired!");
+                // NUEVO: agregar el proyectil al mundo si existe
+                if (projectile != null && gameWorld != null) {
+                    addProjectileToWorld(projectile, fireOrigin, fireDirection);
+                }
+
+                Gdx.app.log("GameController", "Cannon fired from LB button!");
             }
         }
 
@@ -233,6 +229,35 @@ public class GameController {
         }
     }
 
+    // NUEVO: método para agregar proyectil al mundo
+    private void addProjectileToWorld(Projectile projectile, Vector2 origin, Vector2 direction) {
+        // Calcular velocidad del proyectil (400 unidades por segundo en la dirección)
+        Vector2 velocity = direction.cpy().scl(400f);
+
+        // Crear entidad proyectil
+        Entity projectileEntity = new Entity();
+
+        // Transformación
+        TransformComponent transform = new TransformComponent(origin.cpy(), direction.angleDeg());
+        projectileEntity.addComponent(transform);
+
+        // Física
+        PhysicsComponent physics = new PhysicsComponent();
+        physics.velocity = velocity;
+        physics.maxSpeed = velocity.len();
+        projectileEntity.addComponent(physics);
+
+        // Renderizado (opcional, puedes crear una textura pequeña)
+        // Por ahora usamos una textura temporal
+
+        // Componente de vida útil (se eliminará después de un tiempo)
+        // Esto se manejará en un sistema de proyectiles más adelante
+
+        gameWorld.addEntity(projectileEntity);
+
+        Gdx.app.log("GameController", "Projectile added to world at: " + origin);
+    }
+
     private void processKeyboardMouseInput(float delta) {
         TankBodyComponent body = playerEntity.getComponent(TankBodyComponent.class);
         TurretComponent turret = playerEntity.getComponent(TurretComponent.class);
@@ -241,7 +266,6 @@ public class GameController {
 
         if (body == null || transform == null) return;
 
-        // Movimiento con teclado (WASD)
         Vector2 moveDirection = new Vector2(0, 0);
 
         if (Gdx.input.isKeyPressed(Input.Keys.W)) moveDirection.y += 1;
@@ -253,7 +277,6 @@ public class GameController {
             moveDirection.nor();
             body.moveDirection = moveDirection;
 
-            // Rotación del cuerpo con teclado
             float targetAngle = moveDirection.angleDeg();
             float angleDiff = targetAngle - currentBodyAngle;
             angleDiff = (angleDiff + 360) % 360;
@@ -274,13 +297,10 @@ public class GameController {
             body.moveDirection.setZero();
         }
 
-        // Rotación de torreta con mouse
         if (turret != null) {
             float mouseX = Gdx.input.getX();
             float mouseY = Gdx.input.getY();
 
-            // Convertir coordenadas de pantalla a mundo
-            // Nota: Esto necesita la cámara para ser preciso
             Vector2 mouseWorldPos = new Vector2(mouseX, mouseY);
             Vector2 direction = mouseWorldPos.cpy().sub(transform.position).nor();
             if (direction.len() > 0) {
@@ -303,7 +323,6 @@ public class GameController {
             }
         }
 
-        // Disparos con mouse
         if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
             if (!isFiringCannon && weapons != null && turret != null) {
                 isFiringCannon = true;
@@ -316,7 +335,11 @@ public class GameController {
                 ).nor();
 
                 weapons.switchWeapon(0);
-                weapons.fireCurrent(fireOrigin, fireDirection);
+                Projectile projectile = weapons.fireCurrent(fireOrigin, fireDirection);
+
+                if (projectile != null && gameWorld != null) {
+                    addProjectileToWorld(projectile, fireOrigin, fireDirection);
+                }
             }
         } else {
             isFiringCannon = false;
@@ -334,7 +357,6 @@ public class GameController {
             }
         }
 
-        // Disparo continuo con teclado
         if (Gdx.input.isKeyPressed(Input.Keys.SPACE)) {
             if (!isFiringCannon && weapons != null && turret != null) {
                 isFiringCannon = true;
@@ -347,7 +369,11 @@ public class GameController {
                 ).nor();
 
                 weapons.switchWeapon(0);
-                weapons.fireCurrent(fireOrigin, fireDirection);
+                Projectile projectile = weapons.fireCurrent(fireOrigin, fireDirection);
+
+                if (projectile != null && gameWorld != null) {
+                    addProjectileToWorld(projectile, fireOrigin, fireDirection);
+                }
             }
         } else {
             isFiringCannon = false;
@@ -366,9 +392,6 @@ public class GameController {
         }
     }
 
-    /**
-     * Actualiza los ángulos desde las entidades (para sincronización)
-     */
     public void updateAngles() {
         if (playerEntity == null) return;
 
@@ -383,9 +406,6 @@ public class GameController {
         }
     }
 
-    /**
-     * Cambia entre controlador y teclado/mouse.
-     */
     public void toggleController() {
         if (Controllers.getControllers().size > 0) {
             useController = !useController;
@@ -393,34 +413,21 @@ public class GameController {
         }
     }
 
-    /**
-     * Vibra el controlador si está disponible.
-     */
     public void vibrate(float duration, float intensity) {
         if (useController && xboxController != null) {
-            // Implementar vibración cuando LibGDX lo soporte
             Gdx.app.log("GameController", "Vibrate: " + duration + "s, intensity: " + intensity);
         }
     }
 
-    /**
-     * Establece sensibilidad del mouse para rotación de torreta.
-     */
     public void setMouseSensitivity(float sensitivity) {
         this.mouseSensitivity = Math.max(0.1f, Math.min(2f, sensitivity));
     }
 
-    /**
-     * Obtiene el estado actual del controlador.
-     */
     public boolean isUsingController() {
         return useController;
     }
 
-    /**
-     * Libera recursos.
-     */
     public void dispose() {
-        // Limpiar recursos si es necesario
+        // Limpiar recursos
     }
 }
