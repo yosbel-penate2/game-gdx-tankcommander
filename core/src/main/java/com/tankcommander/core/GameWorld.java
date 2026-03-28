@@ -43,6 +43,7 @@ public class GameWorld implements EventListener {
     private int enemiesDefeated;
     private int totalScore;
     private float worldTime;
+    private CollisionSystem collisionSystem;
 
     public GameWorld() {
         this.entities = new DelayedRemovalArray<>(true, 100);
@@ -68,8 +69,10 @@ public class GameWorld implements EventListener {
     private void initializeSystems() {
         physicsSystem = new PhysicsSystem();
         aiSystem = new AISystem(null); // Se establecerá el jugador después
+        collisionSystem = new CollisionSystem();
 
         systems.add(physicsSystem);
+        systems.add(collisionSystem);
         systems.add(aiSystem);
     }
 

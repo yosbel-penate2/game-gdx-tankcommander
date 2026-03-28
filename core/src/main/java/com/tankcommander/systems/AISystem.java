@@ -8,6 +8,7 @@ import com.tankcommander.entities.components.TransformComponent;
 import com.tankcommander.entities.components.TankBodyComponent;
 import com.tankcommander.entities.components.TurretComponent;
 import com.tankcommander.entities.components.WeaponComponent;
+import com.tankcommander.entities.components.CollisionComponent;
 
 public class AISystem implements GameSystem {
     private Entity target;
@@ -35,8 +36,18 @@ public class AISystem implements GameSystem {
             TankBodyComponent aiBody = entity.getComponent(TankBodyComponent.class);
             TurretComponent aiTurret = entity.getComponent(TurretComponent.class);
             WeaponComponent aiWeapon = entity.getComponent(WeaponComponent.class);
+            CollisionComponent aiCollision = entity.getComponent(CollisionComponent.class); // NUEVO
 
             if (aiTransform != null && aiPhysics != null && aiBody != null) {
+
+                // SI ESTÁ COLISIONANDO, NO MOVERSE
+                if (aiCollision != null && aiCollision.isColliding) {
+                    aiBody.moveDirection.setZero();
+                    aiPhysics.velocity.setZero();
+                    aiPhysics.force.setZero();
+                    continue; // Saltar movimiento este frame
+                }
+
                 // Move towards player
                 Vector2 directionToTarget = targetTransform.position.cpy()
                     .sub(aiTransform.position)
@@ -50,7 +61,7 @@ public class AISystem implements GameSystem {
                     aiTurret.rotateTo(angleToTarget);
                 }
 
-                // Fire when close enough and facing player
+                // Fire when close enough
                 float distanceToTarget = aiTransform.position.dst(targetTransform.position);
                 if (distanceToTarget < 200f && aiTurret != null && aiWeapon != null) {
                     Vector2 direction = targetTransform.position.cpy()

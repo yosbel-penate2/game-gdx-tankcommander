@@ -7,12 +7,14 @@ public class TankBodyComponent implements Component {
     public float trackSpeed;
     public float turnSpeed;
     public float currentSpeed;
+    public boolean isBlocked;
 
     public TankBodyComponent() {
         this.moveDirection = new Vector2(0, 0);
         this.trackSpeed = 150f;
         this.turnSpeed = 180f;  // Grados por segundo
         this.currentSpeed = 0f;
+        this.isBlocked = false;
     }
 
     @Override

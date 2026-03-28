@@ -6,6 +6,9 @@ import com.tankcommander.entities.Entity;
 import com.tankcommander.entities.components.PhysicsComponent;
 import com.tankcommander.entities.components.TransformComponent;
 import com.tankcommander.entities.components.TankBodyComponent;
+import com.tankcommander.entities.components.CollisionComponent;
+import com.tankcommander.entities.components.TankBodyComponent;
+
 
 public class PhysicsSystem implements GameSystem {
 
@@ -15,8 +18,20 @@ public class PhysicsSystem implements GameSystem {
             TransformComponent transform = entity.getComponent(TransformComponent.class);
             PhysicsComponent physics = entity.getComponent(PhysicsComponent.class);
             TankBodyComponent body = entity.getComponent(TankBodyComponent.class);
+            CollisionComponent collision = entity.getComponent(CollisionComponent.class); // NUEVO
 
             if (transform != null && physics != null) {
+
+                // SI ESTÁ COLISIONANDO, NO APLICAR MOVIMIENTO
+                if (collision != null && collision.isColliding) {
+                    physics.velocity.setZero();
+                    physics.force.setZero();
+                    if (body != null) {
+                        body.moveDirection.setZero();
+                    }
+                    continue;  // Saltar este frame, no mover
+                }
+
                 // Apply movement from tank body
                 if (body != null && body.moveDirection.len() > 0.1f) {
                     Vector2 force = body.moveDirection.cpy().scl(physics.acceleration);

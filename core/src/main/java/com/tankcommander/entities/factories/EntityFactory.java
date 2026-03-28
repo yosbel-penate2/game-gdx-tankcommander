@@ -96,9 +96,18 @@ public class EntityFactory {
         weapons.addWeapon(new MachineGun(12f, 0.12f, 200));
         player.addComponent(weapons);
 
+        // ========== NUEVO: COMPONENTE DE COLISIÓN ==========
+        CollisionComponent collision = new CollisionComponent(32f, 32f, CollisionComponent.CollisionLayer.PLAYER);
+        collision.collisionRadius = 24f;
+        collision.collidesWith = new CollisionComponent.CollisionLayer[] {
+            CollisionComponent.CollisionLayer.ENEMY,
+            CollisionComponent.CollisionLayer.OBSTACLE,
+            CollisionComponent.CollisionLayer.WALL
+        };
+        player.addComponent(collision);
+
         return player;
     }
-
     /**
      * Crea un enemigo de un tipo específico.
      */
@@ -142,14 +151,24 @@ public class EntityFactory {
         turret.rotationSpeed = type.rotationSpeed * 0.8f;
         enemy.addComponent(turret);
 
-        // Armas (cañón básico para enemigos)
+        // Armas
         WeaponComponent weapons = new WeaponComponent();
         weapons.addWeapon(new Cannon(type.damage, 30f, type.fireRate));
         enemy.addComponent(weapons);
 
+        // ========== NUEVO: COMPONENTE DE COLISIÓN ==========
+        CollisionComponent collision = new CollisionComponent(32f, 32f, CollisionComponent.CollisionLayer.ENEMY);
+        collision.collisionRadius = 30f;
+        collision.collidesWith = new CollisionComponent.CollisionLayer[] {
+            CollisionComponent.CollisionLayer.PLAYER,
+            CollisionComponent.CollisionLayer.ENEMY,
+            CollisionComponent.CollisionLayer.OBSTACLE,
+            CollisionComponent.CollisionLayer.WALL
+        };
+        enemy.addComponent(collision);
+
         return enemy;
     }
-
     /**
      * Crea un obstáculo de un tipo específico.
      */
