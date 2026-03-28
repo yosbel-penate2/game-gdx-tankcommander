@@ -4,17 +4,16 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.tankcommander.entities.Entity;
 import com.tankcommander.entities.components.RenderComponent;
 import com.tankcommander.entities.components.TransformComponent;
 import com.tankcommander.entities.components.TurretComponent;
 import com.tankcommander.entities.components.HealthComponent;
+import com.badlogic.gdx.math.Vector2;
 
 /**
  * Sistema de renderizado que dibuja todas las entidades en pantalla.
- * Soporta diferentes capas de renderizado y efectos visuales.
  */
 public class RenderSystem implements GameSystem {
     private SpriteBatch batch;
@@ -35,14 +34,17 @@ public class RenderSystem implements GameSystem {
 
     @Override
     public void update(float delta, Array<Entity> entities) {
-        // Ordenar entidades por capa de renderizado
-        Array<Entity> sortedEntities = (Array<Entity>) entities.select(entity ->
-            entity.hasComponent(RenderComponent.class) &&
-                entity.hasComponent(TransformComponent.class)
-        );
+        // Filtrar entidades que tienen componentes de renderizado y transformación
+        Array<Entity> renderableEntities = new Array<>();
+        for (Entity entity : entities) {
+            if (entity.hasComponent(RenderComponent.class) &&
+                entity.hasComponent(TransformComponent.class)) {
+                renderableEntities.add(entity);
+            }
+        }
 
         // Ordenar por capa (menor capa se renderiza primero - fondo)
-        sortedEntities.sort((e1, e2) -> {
+        renderableEntities.sort((e1, e2) -> {
             RenderComponent r1 = e1.getComponent(RenderComponent.class);
             RenderComponent r2 = e2.getComponent(RenderComponent.class);
             return Integer.compare(r1.layer, r2.layer);
@@ -53,7 +55,7 @@ public class RenderSystem implements GameSystem {
         batch.begin();
 
         // Renderizar todas las entidades
-        for (Entity entity : sortedEntities) {
+        for (Entity entity : renderableEntities) {
             renderEntity(entity);
         }
 
@@ -76,6 +78,10 @@ public class RenderSystem implements GameSystem {
         float originX = width / 2f;
         float originY = height / 2f;
 
+        // Aplicar color con alpha
+        batch.setColor(render.tintColor.r, render.tintColor.g, render.tintColor.b, render.alpha);
+
+        // Dibujar cuerpo
         batch.draw(
             render.textureRegion,
             transform.position.x - originX,
@@ -84,12 +90,12 @@ public class RenderSystem implements GameSystem {
             originY,
             width,
             height,
-            1f,
-            1f,
+            render.flipX ? -1f : 1f,
+            render.flipY ? -1f : 1f,
             transform.rotation
         );
 
-        // Renderizar torreta si existe (separada del cuerpo)
+        // Renderizar torreta si existe
         TurretComponent turret = entity.getComponent(TurretComponent.class);
         if (turret != null && render.turretTexture != null) {
             Vector2 turretWorldPos = turret.getWorldPosition(
@@ -97,19 +103,27 @@ public class RenderSystem implements GameSystem {
                 transform.rotation
             );
 
+            float turretWidth = render.turretTexture.getRegionWidth() * transform.scale.x;
+            float turretHeight = render.turretTexture.getRegionHeight() * transform.scale.y;
+            float turretOriginX = turretWidth / 2f;
+            float turretOriginY = turretHeight / 2f;
+
             batch.draw(
                 render.turretTexture,
-                turretWorldPos.x - render.turretTexture.getRegionWidth() / 2f,
-                turretWorldPos.y - render.turretTexture.getRegionHeight() / 2f,
-                render.turretTexture.getRegionWidth() / 2f,
-                render.turretTexture.getRegionHeight() / 2f,
-                render.turretTexture.getRegionWidth(),
-                render.turretTexture.getRegionHeight(),
+                turretWorldPos.x - turretOriginX,
+                turretWorldPos.y - turretOriginY,
+                turretOriginX,
+                turretOriginY,
+                turretWidth,
+                turretHeight,
                 1f,
                 1f,
                 turret.turretAngle
             );
         }
+
+        // Restaurar color
+        batch.setColor(1, 1, 1, 1);
     }
 
     private void renderDebug(Array<Entity> entities) {
@@ -131,11 +145,12 @@ public class RenderSystem implements GameSystem {
 
             // Dibujar línea de dirección
             shapeRenderer.setColor(1, 0, 0, 1);
+            float angleRad = transform.rotation * MathUtils.degreesToRadians;
             shapeRenderer.line(
                 transform.position.x,
                 transform.position.y,
-                transform.position.x + MathUtils.cosDeg(transform.rotation) * 30,
-                transform.position.y + MathUtils.sinDeg(transform.rotation) * 30
+                transform.position.x + MathUtils.cos(angleRad) * 30,
+                transform.position.y + MathUtils.sin(angleRad) * 30
             );
 
             // Dibujar hitbox de salud si tiene componente de salud
@@ -157,6 +172,10 @@ public class RenderSystem implements GameSystem {
                     5
                 );
             }
+
+            // Dibujar punto central
+            shapeRenderer.setColor(1, 1, 0, 1);
+            shapeRenderer.circle(transform.position.x, transform.position.y, 3);
         }
 
         shapeRenderer.end();

@@ -13,6 +13,7 @@ import com.tankcommander.events.DeathEvent;
 import com.tankcommander.events.EventListener;
 import com.tankcommander.events.GameEvent;
 import com.tankcommander.systems.*;
+import com.badlogic.gdx.Gdx;
 
 import com.badlogic.gdx.Gdx;
 import com.tankcommander.entities.components.Component;
@@ -115,6 +116,16 @@ public class GameWorld implements EventListener {
     public void setPlayer(Entity player) {
         this.player = player;
         aiSystem.setTarget(player);
+
+        // Centrar la cámara inmediatamente en la posición del jugador
+        if (camera != null && player != null) {
+            TransformComponent playerTransform = player.getComponent(TransformComponent.class);
+            if (playerTransform != null) {
+                camera.position.set(playerTransform.position.x, playerTransform.position.y, 0);
+                cameraOffset.set(playerTransform.position.x, playerTransform.position.y);
+                camera.update();
+            }
+        }
     }
 
     /**
