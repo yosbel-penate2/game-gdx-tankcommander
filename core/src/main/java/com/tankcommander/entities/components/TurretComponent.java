@@ -23,9 +23,15 @@ public class TurretComponent implements Component {
         this.turretAngle = angle;
     }
 
+    /**
+     * Obtiene la posición mundial de la torreta.
+     * @param bodyPosition Posición del cuerpo del tanque
+     * @param bodyRotation Rotación del cuerpo en GRADOS
+     */
     public Vector2 getWorldPosition(Vector2 bodyPosition, float bodyRotation) {
+        // Rotar el offset según la rotación del cuerpo (usando grados)
         Vector2 rotatedOffset = offsetFromBody.cpy();
-        rotatedOffset.rotateRad(bodyRotation);
+        rotatedOffset.rotateDeg(bodyRotation);  // Cambiar rotateRad a rotateDeg
         return bodyPosition.cpy().add(rotatedOffset);
     }
 

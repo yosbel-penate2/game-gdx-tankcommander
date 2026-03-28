@@ -86,7 +86,7 @@ public class EntityFactory {
         player.addComponent(body);
 
         // Torreta
-        TurretComponent turret = new TurretComponent(new Vector2(0, 8));
+        TurretComponent turret = new TurretComponent(new Vector2(0, 0));
         turret.rotationSpeed = 240f;
         player.addComponent(turret);
 
@@ -147,7 +147,7 @@ public class EntityFactory {
         enemy.addComponent(body);
 
         // Torreta
-        TurretComponent turret = new TurretComponent(new Vector2(0, 8));
+        TurretComponent turret = new TurretComponent(new Vector2(0, 0));
         turret.rotationSpeed = type.rotationSpeed * 0.8f;
         enemy.addComponent(turret);
 
