@@ -1,0 +1,22 @@
+package com.tankcommander.entities.components;
+
+import com.badlogic.gdx.math.Vector2;
+
+public class TankBodyComponent implements Component {
+    public Vector2 moveDirection;
+    public float trackSpeed;
+    public float turnSpeed;
+    public float currentSpeed;
+
+    public TankBodyComponent() {
+        this.moveDirection = new Vector2(0, 0);
+        this.trackSpeed = 150f;
+        this.turnSpeed = 120f;
+        this.currentSpeed = 0f;
+    }
+
+    @Override
+    public void update(float delta) {
+        // Movement logic handled by PhysicsSystem
+    }
+}
