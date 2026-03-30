@@ -1,5 +1,6 @@
 package com.tankcommander.entities.factories;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
@@ -200,33 +201,76 @@ public class EntityFactory {
     /**
      * Crea un proyectil.
      */
+    /**
+     * Crea un proyectil completo con todos los componentes necesarios.
+     *
+     * @param position Posición inicial del proyectil
+     * @param velocity Velocidad (dirección + magnitud) del proyectil
+     * @param damage Daño que causa al impactar
+     * @param blastRadius Radio de explosión
+     * @param lifeTime Tiempo de vida en segundos
+     * @param type Tipo de proyectil (KINETIC, EXPLOSIVE, ARMOR_PIERCING)
+     * @param owner Entidad que disparó (para evitar autodaño)
+     * @return Entity completa del proyectil lista para añadir al mundo
+     */
     public Entity createProjectile(Vector2 position, Vector2 velocity, float damage,
                                    float blastRadius, float lifeTime,
-                                   com.tankcommander.weapons.Projectile.ProjectileType type) {
+                                   com.tankcommander.weapons.Projectile.ProjectileType type,
+                                   Entity owner) {  // ← NUEVO parámetro OWNER
+
+        // ========== 1. CREAR LA ENTIDAD ==========
         Entity projectile = new Entity();
 
-        // Transformación
+        // ========== 2. COMPONENTE DE TRANSFORMACIÓN (posición y rotación) ==========
         TransformComponent transform = new TransformComponent(position.cpy(), velocity.angleDeg());
         projectile.addComponent(transform);
 
-        // Física
+        // ========== 3. COMPONENTE DE FÍSICA (movimiento) ==========
         PhysicsComponent physics = new PhysicsComponent();
         physics.velocity = velocity.cpy();
         physics.maxSpeed = velocity.len();
+        physics.acceleration = 0;      // Los proyectiles no aceleran
+        physics.deceleration = 0;      // Los proyectiles no frenan solos
         projectile.addComponent(physics);
 
-        // Renderizado (pequeño círculo o textura)
+        // ========== 4. COMPONENTE DE RENDERIZADO (visual) ==========
         RenderComponent render = new RenderComponent(createProjectileTexture(type));
-        render.layer = 2;
-        render.scale = 0.5f;
+        render.layer = 2;              // Capa alta para que se vea encima
+        render.scale = 0.5f;           // Tamaño pequeño
         projectile.addComponent(render);
 
-        // Componente de vida útil (se puede implementar como un componente específico)
-        // Por ahora se manejará en el sistema de proyectiles
+        // ========== 5. COMPONENTE DE PROYECTIL (datos específicos) ==========
+        // ESTO ES NUEVO - creado en el Paso 1
+        ProjectileComponent projectileComp = new ProjectileComponent(
+            damage,      // Daño que causa
+            blastRadius, // Radio de explosión
+            lifeTime,    // Tiempo de vida
+            owner        // Quién disparó (para evitar autodaño)
+        );
+        projectile.addComponent(projectileComp);
+
+        // ========== 6. COMPONENTE DE COLISIÓN (detección de impactos) ==========
+        // ESTO ES LO MÁS IMPORTANTE DE ESTE PASO
+        CollisionComponent collision = new CollisionComponent(8f, 8f, CollisionComponent.CollisionLayer.PROJECTILE);
+        collision.collisionRadius = 6f;  // Radio de colisión (pequeño, tamaño de bala)
+
+        // Definir con qué tipos de entidades puede colisionar este proyectil
+        collision.collidesWith = new CollisionComponent.CollisionLayer[] {
+            CollisionComponent.CollisionLayer.ENEMY,     // Puede golpear enemigos
+            CollisionComponent.CollisionLayer.PLAYER,   // Puede golpear jugadores
+            CollisionComponent.CollisionLayer.OBSTACLE, // Puede golpear obstáculos
+            CollisionComponent.CollisionLayer.WALL      // Puede golpear paredes
+        };
+
+        projectile.addComponent(collision);
+
+        // ========== LOG PARA VERIFICAR CREACIÓN ==========
+        Gdx.app.log("EntityFactory", "Proyectil creado - damage=" + damage +
+            ", owner=" + (owner != null ? owner.id : "null") +
+            ", pos=" + position);
 
         return projectile;
     }
-
     /**
      * Crea una textura de placeholder para obstáculos.
      */

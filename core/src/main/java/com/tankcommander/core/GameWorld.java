@@ -8,6 +8,7 @@ import com.badlogic.gdx.utils.DelayedRemovalArray;
 import com.tankcommander.entities.Entity;
 import com.tankcommander.entities.components.TransformComponent;
 import com.tankcommander.entities.components.HealthComponent;
+import com.tankcommander.entities.factories.EntityFactory;
 import com.tankcommander.events.EventManager;
 import com.tankcommander.events.DeathEvent;
 import com.tankcommander.events.EventListener;
@@ -43,6 +44,9 @@ public class GameWorld implements EventListener {
     private int totalScore;
     private float worldTime;
 
+    private EntityFactory entityFactory;
+
+
     public GameWorld() {
         this.entities = new DelayedRemovalArray<>(true, 100);
         this.systems = new Array<>();
@@ -53,8 +57,15 @@ public class GameWorld implements EventListener {
         this.totalScore = 0;
         this.worldTime = 0f;
 
+        this.entityFactory = new EntityFactory(null, eventManager);
+
         initializeSystems();
         subscribeToEvents();
+    }
+
+    // ========== NUEVO: MÉTODO GETTER ==========
+    public EntityFactory getEntityFactory() {
+        return entityFactory;
     }
 
     public GameWorld(OrthographicCamera camera, SpriteBatch batch) {

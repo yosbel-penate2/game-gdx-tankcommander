@@ -240,29 +240,45 @@ public class GameController {
     }
 
     // NUEVO: método para agregar proyectil al mundo
+
+    /**
+     * Método para agregar un proyectil al mundo.
+     *
+     * @param projectile Datos del proyectil (daño, velocidad, etc.)
+     * @param origin Posición desde donde se dispara (punta de la torreta)
+     * @param direction Dirección del disparo (vector normalizado)
+     */
     private void addProjectileToWorld(Projectile projectile, Vector2 origin, Vector2 direction) {
-        Vector2 velocity = direction.cpy().scl(400f);
-        Entity projectileEntity = new Entity();
+        if (projectile == null || gameWorld == null || playerEntity == null) return;
 
-        // Transformación
-        TransformComponent transform = new TransformComponent(origin.cpy(), direction.angleDeg());
-        projectileEntity.addComponent(transform);
+        // ========== DESPLAZAR EL PROYECTIL HACIA ADELANTE ==========
+        // Multiplicador de distancia (ajusta según el tamaño de tu tanque)
+        float spawnOffset = 35f;  // Distancia desde la torreta hacia adelante
 
-        // Física
-        PhysicsComponent physics = new PhysicsComponent();
-        physics.velocity = velocity;
-        physics.maxSpeed = velocity.len();
-        projectileEntity.addComponent(physics);
+        // Calcular la posición OFFSET (más adelante en la dirección del disparo)
+        Vector2 spawnPosition = origin.cpy().add(direction.cpy().scl(spawnOffset));
 
-        // Renderizado - IMPORTANTE: crear una textura visible
-        Texture projectileTexture = createProjectileTexture();
-        RenderComponent render = new RenderComponent(new TextureRegion(projectileTexture));
-        render.layer = 2;
-        render.scale = 0.5f;
-        projectileEntity.addComponent(render);
+        // Velocidad del proyectil
+        float speed = projectile.velocity != null ? projectile.velocity.len() : 400f;
+        Vector2 velocity = direction.cpy().scl(speed);
 
-        gameWorld.addEntity(projectileEntity);
-        Gdx.app.log("GameController", "Proyectil añadido al mundo en: " + origin);
+        // Log para depuración
+        Gdx.app.log("GameController", "Disparando - origen=" + origin + ", spawn=" + spawnPosition);
+
+        // Crear proyectil con la posición OFFSET
+        Entity projectileEntity = gameWorld.getEntityFactory().createProjectile(
+            spawnPosition,    // ← POSICIÓN DESPLAZADA (no el origen)
+            velocity,
+            projectile.damage,
+            projectile.blastRadius,
+            projectile.lifeTime,
+            projectile.type,
+            playerEntity
+        );
+
+        if (projectileEntity != null) {
+            gameWorld.addEntity(projectileEntity);
+        }
     }
 
     private Texture createProjectileTexture() {
