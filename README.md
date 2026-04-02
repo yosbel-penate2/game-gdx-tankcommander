@@ -448,3 +448,7 @@ classDiagram
 - Power-ups (crear nuevas armas con `Strategy`)
 - Sistema de partículas (eventos de impacto)
 - Guardado/carga de progreso
+
+![Tank Projectile](readmeImg/tankprojectile.png)
+
+![Tank Move](readmeImg/tankmove.png)
