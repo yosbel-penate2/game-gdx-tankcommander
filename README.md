@@ -449,6 +449,8 @@ classDiagram
 - Sistema de partículas (eventos de impacto)
 - Guardado/carga de progreso
 
+![Tank Move](readmeImg/tankmove.png)
+
 ![Tank Projectile](readmeImg/tankprojectile.png)
 
-![Tank Move](readmeImg/tankmove.png)
+
